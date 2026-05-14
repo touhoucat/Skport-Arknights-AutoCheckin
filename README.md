@@ -1,5 +1,8 @@
 # Skport-Arknights-AutoCheckin
 
+> [!NOTE]
+> This script is specifically designed for **Arknights (明日方舟)**. It is **NOT** compatible with Arknights: Endfield (終末地).
+
 A cross-platform (Windows / Linux / macOS) PowerShell script to automate the daily check-in for Arknights via the Skport platform. It uses a headless browser and Chrome DevTools Protocol (CDP) to handle authentication efficiently.
 
 ## ✨ Features
@@ -67,6 +70,10 @@ Add the following to your crontab (`crontab -e`) to run every day at 09:00:
 ## ⚖️ License
 
 Distributed under the **MIT License**.
+
+## 🏷️ GitHub Topics (Recommended Tags)
+If you are hosting this on GitHub, I recommend adding these topics to make it searchable:
+`arknights` `auto-checkin` `powershell` `skport` `automation` `明日方舟`
 
 ## ⚠️ Disclaimer
 This tool is for educational purposes only. Use it at your own risk. The author is not responsible for any account bans or issues related to the use of this script.
