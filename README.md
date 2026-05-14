@@ -15,6 +15,10 @@ A cross-platform (Windows / Linux / macOS) PowerShell script to automate the dai
 1. **PowerShell 7.0+** (Recommended) or **Windows PowerShell 5.1**
 2. **Chromium-based Browser**: Google Chrome or Microsoft Edge installed.
 
+> [!IMPORTANT]
+> **Encoding Note for Windows PowerShell 5.1**:
+> If you are using Windows PowerShell 5.1, the script file **must** be saved with **UTF-8 with BOM** encoding. This is required for the script to correctly interpret special characters (like Emojis and symbols) used in the code.
+
 ## ⚙️ Configuration
 
 Open `Skport_Arknights_AutoCheckin.ps1` and edit the following settings at the top of the file:
@@ -24,7 +28,7 @@ Open `Skport_Arknights_AutoCheckin.ps1` and edit the following settings at the t
 $SK_OAUTH_CRED_KEY = "your_key_here"  # Found in your browser cookies for skport.com
 $uid               = "12345678"       # Your Arknights Game ID
 $server            = "2"              # Asia=2 / Americas=3 / Europe=3
-$language          = "zh_Hant"        # english=en / 繁體中文=zh_Hant / 简体中文=zh_Hans / 日本語=ja / 한국어=ko
+$language          = "zh_Hant"        # zh_Hant / zh_Hans / en / ja / ko
 
 # --- Optional Telegram Notifications ---
 $telegram_notify   = $false           # Set to $true to enable
