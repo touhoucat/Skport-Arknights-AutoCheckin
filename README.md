@@ -51,22 +51,32 @@ $BrowserChoice     = "auto"          # auto / chrome / edge / or "C:\path\to\exe
 
 ## 🚀 Usage
 
+### 1. Manual Execution
 Run the script manually from your terminal:
-
 ```powershell
 pwsh ./Skport_Arknights_AutoCheckin.ps1
 ```
 
-## ⏰ Automation
+### 2. Automatic Setup (Recommended)
+We provide a registration script to automatically set up the check-in to run at **startup** and **daily at 00:00 (Local Time)**.
 
-### Windows (Task Scheduler)
-Create a task to run `pwsh.exe` with the argument `-File "C:\path\to\Skport_Arknights_AutoCheckin.ps1"`.
-
-### Linux / macOS (Crontab)
-Add the following to your crontab (`crontab -e`) to run every day at 09:00:
-```bash
-0 9 * * * /usr/bin/pwsh /path/to/Skport_Arknights_AutoCheckin.ps1
+**Windows**:
+Run PowerShell as **Administrator**, then:
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope Process
+./Register_Automation.ps1
 ```
+
+**Linux / macOS**:
+```powershell
+pwsh ./Register_Automation.ps1
+```
+
+## ⏰ Automation Details
+The registration script uses the following system tools:
+- **Windows**: Task Scheduler (Action: `Hidden`, Trigger: `AtLogon` & `00:00 Daily`).
+- **Linux**: Crontab (`@reboot` & `00:00` daily).
+- **macOS**: LaunchAgents (`RunAtLoad` & `StartCalendarInterval`).
 
 ## ⚖️ License
 
