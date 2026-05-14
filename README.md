@@ -9,15 +9,14 @@ A cross-platform (Windows / Linux / macOS) PowerShell script to automate the dai
 
 ## ✨ Features
 
-- **Cross-Platform**: Works on Windows, Linux, and macOS (requires PowerShell 7+).
+- **Cross-Platform**: Works on Windows, Linux, and macOS (requires PowerShell).
 - **Headless Operation**: Runs in the background without opening a browser window.
 - **Smart Authentication**: Extracts tokens directly from local storage using CDP.
 - **Notifications**: Optional Telegram bot integration for daily status reports.
-- **Resource Efficient**: Uses asynchronous streams and minimal memory footprints.
 
 ## 📋 Requirements
 
-1. **PowerShell 7.0+** (Recommended) or **Windows PowerShell 5.1**
+1. **PowerShell 7.0+** (Recommended) or **Windows PowerShell 5.1** (usually built-in)
 2. **Chromium-based Browser**: Google Chrome or Microsoft Edge installed.
 
 > [!IMPORTANT]
