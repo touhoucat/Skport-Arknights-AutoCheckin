@@ -1,12 +1,19 @@
-﻿# Skport-Arknights Automation Register ( Windows / Linux / macOS )
-# This script registers Skport_Arknights_AutoCheckin.ps1 to run at startup and daily at 00:00.
+# Skport-Arknights Automation Register ( Windows / Linux / macOS )
+# This script registers Skport_Arknights_AutoCheckin.ps1 to run at system startup and daily at 00:00.
+
+# ── Auto-Elevate to Administrator (Windows Only) ──────────────────────
+if ($IsWindows -and -not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Host "🛡️ Requesting Administrator privileges..." -ForegroundColor Yellow
+    Start-Process (Get-Process -Id $PID).Path -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    exit
+}
 
 $ScriptName = "Skport_Arknights_AutoCheckin.ps1"
-$CurrentDir = Get-Location
-$ScriptPath = Join-Path $CurrentDir $ScriptName
+$ScriptPath = Join-Path $PSScriptRoot $ScriptName
 
 if (!(Test-Path $ScriptPath)) {
-    Write-Host "❌ Error: $ScriptName not found in $CurrentDir" -ForegroundColor Red
+    Write-Host "❌ Error: $ScriptName not found in $PSScriptRoot" -ForegroundColor Red
+    Pause
     exit 1
 }
 
@@ -98,3 +105,4 @@ elseif ($IsMacOS) {
 }
 
 Write-Host "✨ Automation setup complete!" -ForegroundColor Cyan
+Pause
