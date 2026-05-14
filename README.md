@@ -61,15 +61,7 @@ pwsh ./Skport_Arknights_AutoCheckin.ps1
 You can use the registration script to automatically set up the check-in to run at **system startup** and **daily at 00:00 (Local Time)**.
 
 **Windows**:
-1. Open PowerShell as **Administrator**.
-2. Run the following commands:
-```powershell
-# Temporarily allow script execution for this session
-Set-ExecutionPolicy RemoteSigned -Scope Process
-
-# Register the automation tasks
-./Register_Automation.ps1
-```
+Right-click `Register_Automation.ps1` and select **"Run with PowerShell"**. It will automatically request Administrator privileges to set up the tasks.
 
 **Linux / macOS**:
 Run the registration script:
