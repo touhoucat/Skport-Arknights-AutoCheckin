@@ -24,7 +24,7 @@ Open `Skport_Arknights_AutoCheckin.ps1` and edit the following settings at the t
 $SK_OAUTH_CRED_KEY = "your_key_here"  # Found in your browser cookies for skport.com
 $uid               = "12345678"       # Your Arknights Game ID
 $server            = "2"              # Asia=2 / Americas=3 / Europe=3
-$language          = "zh_Hant"        # zh_Hant / zh_Hans / en / ja / ko
+$language          = "zh_Hant"        # english=en / 繁體中文=zh_Hant / 简体中文=zh_Hans / 日本語=ja / 한국어=ko
 
 # --- Optional Telegram Notifications ---
 $telegram_notify   = $false           # Set to $true to enable
