@@ -1,13 +1,68 @@
-# Skport-Arknights-AutoCheckin ( Windows / Linux / macOS )
+# Skport-Arknights-AutoCheckin
 
-# ── Settings ───────────────────────────────────────────
-$SK_OAUTH_CRED_KEY = "AAbbCC99Sk0aUtH1XXXCrED8KeY2kI8e" # your skport SK_OAUTH_CRED_KEY in cookie
-$uid = "12345678"                                       # your Arknights game ID
-$server = "2"                                           # Asia=2 / Americas=3 / Europe=3
-$language = "zh_Hant"                                   # english=en / 繁體中文=zh_Hant / 简体中文=zh_Hans / 日本語=ja / 한국어=ko
+A cross-platform (Windows / Linux / macOS) PowerShell script to automate the daily check-in for Arknights via the Skport platform. It uses a headless browser and Chrome DevTools Protocol (CDP) to handle authentication efficiently.
 
-$telegram_notify = $false
-$myTelegramID = ""
-$telegramBotToken = ""
+## ✨ Features
 
-$BrowserChoice = "auto" # auto / chrome / edge / <absolute path>
+- **Cross-Platform**: Works on Windows, Linux, and macOS (requires PowerShell 7+).
+- **Headless Operation**: Runs in the background without opening a browser window.
+- **Smart Authentication**: Extracts tokens directly from local storage using CDP.
+- **Notifications**: Optional Telegram bot integration for daily status reports.
+- **Resource Efficient**: Uses asynchronous streams and minimal memory footprints.
+
+## 📋 Requirements
+
+1. **PowerShell 7.0+** (Recommended) or **Windows PowerShell 5.1**
+2. **Chromium-based Browser**: Google Chrome or Microsoft Edge installed.
+
+## ⚙️ Configuration
+
+Open `Skport_Arknights_AutoCheckin.ps1` and edit the following settings at the top of the file:
+
+```powershell
+# --- Required ---
+$SK_OAUTH_CRED_KEY = "your_key_here"  # Found in your browser cookies for skport.com
+$uid               = "12345678"       # Your Arknights Game ID
+$server            = "2"              # Asia=2 / Americas=3 / Europe=3
+$language          = "zh_Hant"        # zh_Hant / zh_Hans / en / ja / ko
+
+# --- Optional Telegram Notifications ---
+$telegram_notify   = $false           # Set to $true to enable
+$myTelegramID      = ""               # Your Telegram Chat ID
+$telegramBotToken  = ""               # Your Telegram Bot Token
+
+# --- Browser Selection ---
+$BrowserChoice     = "auto"           # auto / chrome / edge / or "C:\path\to\exe"
+```
+
+### How to find $SK_OAUTH_CRED_KEY?
+1. Login to the [Skport Arknights page](https://game.skport.com/arknights/sign-in).
+2. Press `F12` to open Developer Tools.
+3. Go to the **Application** tab -> **Cookies** -> `https://game.skport.com`.
+4. Copy the value of the cookie named `SK_OAUTH_CRED_KEY`.
+
+## 🚀 Usage
+
+Run the script manually from your terminal:
+
+```powershell
+pwsh ./Skport_Arknights_AutoCheckin.ps1
+```
+
+## ⏰ Automation
+
+### Windows (Task Scheduler)
+Create a task to run `pwsh.exe` with the argument `-File "C:\path\to\Skport_Arknights_AutoCheckin.ps1"`.
+
+### Linux / macOS (Crontab)
+Add the following to your crontab (`crontab -e`) to run every day at 09:00:
+```bash
+0 9 * * * /usr/bin/pwsh /path/to/Skport_Arknights_AutoCheckin.ps1
+```
+
+## ⚖️ License
+
+Distributed under the **MIT License**.
+
+## ⚠️ Disclaimer
+This tool is for educational purposes only. Use it at your own risk. The author is not responsible for any account bans or issues related to the use of this script.
