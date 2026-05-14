@@ -1,7 +1,8 @@
 # Skport-Arknights-AutoCheckin
 
 > [!NOTE]
-> This script is specifically designed for **Arknights (明日方舟)**. It is **NOT** compatible with Arknights: Endfield (終末地).
+> This script is specifically designed for **Arknights (明日方舟)**.
+> It is **NOT** compatible with Arknights: Endfield (終末地).
 
 A cross-platform (Windows / Linux / macOS) PowerShell script to automate the daily check-in for Arknights via the Skport platform. It uses a headless browser and Chrome DevTools Protocol (CDP) to handle authentication efficiently.
 
