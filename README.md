@@ -73,4 +73,4 @@ Add the following to your crontab (`crontab -e`) to run every day at 09:00:
 Distributed under the **MIT License**.
 
 ## ⚠️ Disclaimer
-This tool is for educational purposes only. Use it at your own risk. The author is not responsible for any account bans or issues related to the use of this script.
+This project is for educational and exchange purposes only. Please do not use it for any commercial purposes. The user assumes all responsibility for any account issues (such as bans or anomalies) caused by using this tool.
