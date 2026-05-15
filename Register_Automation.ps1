@@ -1,11 +1,26 @@
-# Skport-Arknights Automation Register ( Windows / Linux / macOS )
-# This script registers Skport_Arknights_AutoCheckin.ps1 to run at system startup and daily at 00:00.
+# This script registers Skport_Arknights_AutoCheckin.ps1 to run at system startup and daily.
+
+# ── Settings ──────────────────────────────────────────────────────────
+$AutoCheckinTime = "00:00"  # Format: HH:mm (24-hour clock)
+# ──────────────────────────────────────────────────────────────────────
 
 # ── Auto-Elevate to Administrator (Windows Only) ──────────────────────
-if ($IsWindows -and -not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "🛡️ Requesting Administrator privileges..." -ForegroundColor Yellow
-    Start-Process (Get-Process -Id $PID).Path -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
-    exit
+if ($IsWindows -or $env:OS -eq "Windows_NT") {
+    $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        Write-Host "🛡️  Standard user detected. Requesting Administrator privileges..." -ForegroundColor Yellow
+        $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+        try {
+            Start-Process (Get-Process -Id $PID).Path -ArgumentList $arguments -Verb RunAs -ErrorAction Stop
+            exit
+        }
+        catch {
+            Write-Host "❌ Failed to elevate: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "Please right-click and 'Run as Administrator' manually." -ForegroundColor White
+            Pause
+            exit 1
+        }
+    }
 }
 
 $ScriptName = "Skport_Arknights_AutoCheckin.ps1"
@@ -17,10 +32,17 @@ if (!(Test-Path $ScriptPath)) {
     exit 1
 }
 
+# Parse time for different platforms
+$timeParts = $AutoCheckinTime -split ":"
+$hour = [int]$timeParts[0]
+$minute = [int]$timeParts[1]
+$winTime = "$($hour.ToString('00')):$($minute.ToString('00'))"
+
 # Get the path to the PowerShell executable
 $PwshExe = (Get-Process -Id $PID).Path
 
 Write-Host "🚀 Registering Automation for: $ScriptPath" -ForegroundColor Cyan
+Write-Host "   Schedule: Startup & Daily at $AutoCheckinTime" -ForegroundColor DarkGray
 
 # ── Windows (Task Scheduler) ──────────────────────────────────────────
 if ($IsWindows -or $env:OS -eq "Windows_NT") {
@@ -29,22 +51,21 @@ if ($IsWindows -or $env:OS -eq "Windows_NT") {
     
     # Trigger 1: At Logon
     $T1 = New-ScheduledTaskTrigger -AtLogOn
-    # Trigger 2: Daily at 00:00
-    $T2 = New-ScheduledTaskTrigger -Daily -At "12:00 AM"
+    # Trigger 2: Daily at the specified time
+    $T2 = New-ScheduledTaskTrigger -Daily -At $winTime
 
     try {
         Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $T1, $T2 -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries) -Force | Out-Null
         Write-Host "✅ Windows Task Scheduler: Registered '$TaskName'" -ForegroundColor Green
-        Write-Host "   - Runs at logon" -ForegroundColor Gray
-        Write-Host "   - Runs daily at 00:00" -ForegroundColor Gray
-    } catch {
-        Write-Host "❌ Windows: Failed to register task. Please run as Administrator." -ForegroundColor Red
+    }
+    catch {
+        Write-Host "❌ Windows: Failed to register task. (Error: $($_.Exception.Message))" -ForegroundColor Red
     }
 }
 
 # ── Linux (Crontab) ───────────────────────────────────────────────────
 elseif ($IsLinux) {
-    $CronDaily = "0 0 * * * `"$PwshExe`" -File `"$ScriptPath`" > /dev/null 2>&1"
+    $CronDaily = "$minute $hour * * * `"$PwshExe`" -File `"$ScriptPath`" > /dev/null 2>&1"
     $CronReboot = "@reboot `"$PwshExe`" -File `"$ScriptPath`" > /dev/null 2>&1"
     
     $CurrentCron = try { crontab -l 2>$null } catch { "" }
@@ -58,8 +79,8 @@ elseif ($IsLinux) {
     try {
         & crontab $TempFile
         Write-Host "✅ Linux Crontab: Updated." -ForegroundColor Green
-        Write-Host "   - Added @reboot and 00:00 schedule" -ForegroundColor Gray
-    } finally {
+    }
+    finally {
         Remove-Item $TempFile
     }
 }
@@ -87,9 +108,9 @@ elseif ($IsMacOS) {
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
-        <integer>0</integer>
+        <integer>$hour</integer>
         <key>Minute</key>
-        <integer>0</integer>
+        <integer>$minute</integer>
     </dict>
 </dict>
 </plist>
@@ -99,7 +120,8 @@ elseif ($IsMacOS) {
         & launchctl unload $PlistPath 2>$null
         & launchctl load $PlistPath
         Write-Host "✅ macOS LaunchAgent: Registered at $PlistPath" -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "❌ macOS: Failed to create LaunchAgent." -ForegroundColor Red
     }
 }
