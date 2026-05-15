@@ -241,8 +241,12 @@ else {
 }
 
 if ($telegram_notify -and $telegramBotToken -and $myTelegramID) {
-    $tgBody = @{ chat_id = $myTelegramID; text = $result; parse_mode = "HTML" } | ConvertTo-Json -Depth 2 -Compress
-    try { Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/sendMessage" -Method Post -Body $tgBody -ContentType "application/json" -TimeoutSec 10 | Out-Null } catch {}
+    $tgJson = @{ chat_id = $myTelegramID; text = $result; parse_mode = "HTML" } | ConvertTo-Json -Depth 2 -Compress
+    $tgBytes = [System.Text.Encoding]::UTF8.GetBytes($tgJson)
+    try { 
+        Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/sendMessage" -Method Post -Body $tgBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 10 | Out-Null 
+    }
+    catch {}
 }
 
 Write-Host "   ⏱️ Done: $([math]::Round($GlobalStopwatch.Elapsed.TotalSeconds, 1))s" -ForegroundColor DarkGray
