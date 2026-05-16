@@ -231,9 +231,7 @@ if (![string]::IsNullOrWhiteSpace($uid) -and ![string]::IsNullOrWhiteSpace($SK_O
 
 if ($telegram_notify) {
     $fetched = Get-TelegramCredentials
-    if ($fetched.Count -gt 0) {
-        Write-Host "✅ Telegram credentials found ($($fetched.Count) accounts)" -ForegroundColor Gray
-    }
+    if ($fetched.Count -gt 0) { Write-Host "✅ Telegram credentials found ($($fetched.Count) accounts)" -ForegroundColor Gray }
     $AccountList += $fetched
 }
 
@@ -273,9 +271,7 @@ if ($AccountList.Count -gt 0) {
             }
             catch {
                 $ok = $false; $msg = $_.Exception.Message
-                if ($_.ErrorDetails.Message) {
-                    try { $j = $_.ErrorDetails.Message | ConvertFrom-Json; if ($j.message) { $msg = $j.message } } catch {}
-                }
+                if ($_.ErrorDetails.Message) { try { $j = $_.ErrorDetails.Message | ConvertFrom-Json; if ($j.message) { $msg = $j.message } } catch {} }
             }
 
             $res = "$(if ($ok) { '✅' } else { '❌' }) [$u]: $msg"
@@ -288,9 +284,7 @@ if ($AccountList.Count -gt 0) {
         $summary = $AllResults -join "`n"
         $tgJson = @{ chat_id = $myTelegramID; text = "<b>Skport_Arknights_AutoCheckin:</b>`n$summary"; parse_mode = "HTML" } | ConvertTo-Json -Depth 2 -Compress
         $tgBytes = [System.Text.Encoding]::UTF8.GetBytes($tgJson)
-        try { 
-            Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/sendMessage" -Method Post -Body $tgBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 30 | Out-Null 
-        }
+        try { Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/sendMessage" -Method Post -Body $tgBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 30 | Out-Null }
         catch {}
     }
 }
