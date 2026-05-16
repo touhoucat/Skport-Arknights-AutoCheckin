@@ -13,6 +13,7 @@ $telegramBotToken = ""
 $BrowserChoice = "auto" # auto / chrome / edge / <absolute path>
 # ──────────────────────────────────────────────────────
 
+$telegram_regex = '(?i)UID[:\uFF1A]\s*(\d{8})[\s,\uFF0C]*KEY[:\uFF1A]\s*([a-zA-Z0-9]{32})'
 $GlobalStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 $IsLinuxPlatform = $PSVersionTable.PSEdition -eq 'Core' -and $IsLinux
 $baseUrl = "https://zonai.skport.com"
@@ -34,6 +35,24 @@ $DefaultHeaders = @{
 function Send-WsFrame ($Ws, $Json) {
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($Json)
     $Ws.SendAsync([System.ArraySegment[byte]]::new($bytes), [System.Net.WebSockets.WebSocketMessageType]::Text, $true, [System.Threading.CancellationToken]::None).Wait()
+}
+
+function Get-TelegramCredentials {
+    if (!$telegramBotToken) { return @() }
+    $accounts = @()
+    try {
+        $updates = Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/getUpdates" -TimeoutSec 30
+        if ($updates.ok -and $updates.result) {
+            foreach ($u in $updates.result) {
+                $text = if ($u.message.text) { $u.message.text } elseif ($u.channel_post.text) { $u.channel_post.text } else { "" }
+                if ($text -match $telegram_regex) {
+                    foreach ($m in [regex]::Matches($text, $telegram_regex)) { $accounts += [PSCustomObject]@{ UID = $m.Groups[1].Value; Key = $m.Groups[2].Value } }
+                }
+            }
+        }
+    }
+    catch { Write-Host "⚠️ Telegram fetch failed: $($_.Exception.Message)" -ForegroundColor Yellow }
+    return $accounts | Group-Object UID | ForEach-Object { $_.Group | Select-Object -Last 1 }
 }
 
 # ── Token ──────────────────────────────────────────────
@@ -114,7 +133,7 @@ function Get-SkToken {
     for ($i = 0; $i -lt 60; $i++) {
         Start-Sleep -Milliseconds 500
         try {
-            $targets = Invoke-RestMethod -Uri "http://localhost:$port/json" -TimeoutSec 3 -ErrorAction Stop
+            $targets = Invoke-RestMethod -Uri "http://localhost:$port/json" -TimeoutSec 10 -ErrorAction Stop
             $wsUrl = ($targets | Where-Object { $_.type -eq "page" } | Select-Object -First 1).webSocketDebuggerUrl
             if ($wsUrl) { break }
         }
@@ -204,49 +223,76 @@ function New-SkportSignature ($Body, $Headers, $Token) {
 Write-Host "╔══════════════════════════════╗" -ForegroundColor DarkCyan
 Write-Host "║   Skport Auto Sign-in Bot    ║" -ForegroundColor DarkCyan
 Write-Host "╚══════════════════════════════╝" -ForegroundColor DarkCyan
-Write-Host "┌─ 🤖 UID: $uid" -ForegroundColor DarkCyan
 
-$tk = Get-SkToken -OAuthKey $SK_OAUTH_CRED_KEY
-
-if (-not $tk.OK) {
-    $result = "❌ [$uid]: $($tk.Value)"
-    Write-Host "└─ $result" -ForegroundColor Red
+$AccountList = @()
+if (![string]::IsNullOrWhiteSpace($uid) -and ![string]::IsNullOrWhiteSpace($SK_OAUTH_CRED_KEY)) {
+    $AccountList += [PSCustomObject]@{ UID = $uid; Key = $SK_OAUTH_CRED_KEY }
 }
-else {
-    Write-Host "│  🔑 $($tk.Value)" -ForegroundColor DarkYellow
 
-    $ts = [Math]::Floor([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()).ToString()
-    $body = "{`"uid`":`"$uid`"}"
-    $headers = $DefaultHeaders.Clone()
-    $headers["cred"] = $SK_OAUTH_CRED_KEY
-    $headers["sk-game-role"] = "3_$($uid)_$server"
-    $headers["sk-language"] = $language
-    $headers["timestamp"] = $ts
-    $headers["sign"] = New-SkportSignature -Body $body -Headers $headers -Token $tk.Value
-
-    try {
-        $resp = Invoke-RestMethod "$baseUrl/api/v1/game/attendance" -Method Post -Headers $headers -Body $body -TimeoutSec 10 -ErrorAction Stop
-        $ok = $resp.code -ne 10000
-        $msg = if ($resp.code -eq 10000) { "Token expired after refresh!" } else { $resp.message }
+if ($telegram_notify) {
+    $fetched = Get-TelegramCredentials
+    if ($fetched.Count -gt 0) {
+        Write-Host "✅ Telegram credentials found ($($fetched.Count) accounts)" -ForegroundColor Gray
     }
-    catch {
-        $ok = $false; $msg = $_.Exception.Message
-        if ($_.ErrorDetails.Message) {
-            try { $j = $_.ErrorDetails.Message | ConvertFrom-Json; if ($j.message) { $msg = $j.message } } catch {}
+    $AccountList += $fetched
+}
+
+# Deduplicate
+$AccountList = $AccountList | Group-Object UID | ForEach-Object { $_.Group | Select-Object -Last 1 }
+
+if ($AccountList.Count -gt 0) {
+    $AllResults = @()
+    foreach ($acc in $AccountList) {
+        $u = $acc.UID
+        $k = $acc.Key
+        Write-Host "┌─ 🤖 UID: $u" -ForegroundColor DarkCyan
+
+        $tk = Get-SkToken -OAuthKey $k
+
+        if (-not $tk.OK) {
+            $res = "❌ [$u]: $($tk.Value)"
+            Write-Host "└─ $res" -ForegroundColor Red
+            $AllResults += $res
+        }
+        else {
+            Write-Host "│  🔑 $($tk.Value)" -ForegroundColor DarkYellow
+
+            $ts = [Math]::Floor([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()).ToString()
+            $body = "{`"uid`":`"$u`"}"
+            $headers = $DefaultHeaders.Clone()
+            $headers["cred"] = $k
+            $headers["sk-game-role"] = "3_$($u)_$server"
+            $headers["sk-language"] = $language
+            $headers["timestamp"] = $ts
+            $headers["sign"] = New-SkportSignature -Body $body -Headers $headers -Token $tk.Value
+
+            try {
+                $resp = Invoke-RestMethod "$baseUrl/api/v1/game/attendance" -Method Post -Headers $headers -Body $body -TimeoutSec 30 -ErrorAction Stop
+                $ok = $resp.code -ne 10000
+                $msg = if ($resp.code -eq 10000) { "Token expired after refresh!" } else { $resp.message }
+            }
+            catch {
+                $ok = $false; $msg = $_.Exception.Message
+                if ($_.ErrorDetails.Message) {
+                    try { $j = $_.ErrorDetails.Message | ConvertFrom-Json; if ($j.message) { $msg = $j.message } } catch {}
+                }
+            }
+
+            $res = "$(if ($ok) { '✅' } else { '❌' }) [$u]: $msg"
+            Write-Host "└─ $res" -ForegroundColor $(if ($ok) { "Green" } else { "Red" })
+            $AllResults += $res
         }
     }
 
-    $result = "$(if ($ok) { '✅' } else { '❌' }) [$uid]: $msg"
-    Write-Host "└─ $result" -ForegroundColor $(if ($ok) { "Green" } else { "Red" })
-}
-
-if ($telegram_notify -and $telegramBotToken -and $myTelegramID) {
-    $tgJson = @{ chat_id = $myTelegramID; text = $result; parse_mode = "HTML" } | ConvertTo-Json -Depth 2 -Compress
-    $tgBytes = [System.Text.Encoding]::UTF8.GetBytes($tgJson)
-    try { 
-        Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/sendMessage" -Method Post -Body $tgBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 10 | Out-Null 
+    if ($telegram_notify -and $telegramBotToken -and $myTelegramID) {
+        $summary = $AllResults -join "`n"
+        $tgJson = @{ chat_id = $myTelegramID; text = "<b>Skport_Arknights_AutoCheckin:</b>`n$summary"; parse_mode = "HTML" } | ConvertTo-Json -Depth 2 -Compress
+        $tgBytes = [System.Text.Encoding]::UTF8.GetBytes($tgJson)
+        try { 
+            Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/sendMessage" -Method Post -Body $tgBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 30 | Out-Null 
+        }
+        catch {}
     }
-    catch {}
 }
 
-Write-Host "   ⏱️ Done: $([math]::Round($GlobalStopwatch.Elapsed.TotalSeconds, 1))s" -ForegroundColor DarkGray
+Write-Host "⏱️ Done: $([math]::Round($GlobalStopwatch.Elapsed.TotalSeconds, 1))s" -ForegroundColor DarkGray
