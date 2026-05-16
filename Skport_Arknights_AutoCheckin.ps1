@@ -46,7 +46,9 @@ function Get-TelegramCredentials {
             foreach ($u in $updates.result) {
                 $text = if ($u.message.text) { $u.message.text } elseif ($u.channel_post.text) { $u.channel_post.text } else { "" }
                 if ($text -match $telegram_regex) {
-                    foreach ($m in [regex]::Matches($text, $telegram_regex)) { $accounts += [PSCustomObject]@{ UID = $m.Groups[1].Value; Key = $m.Groups[2].Value } }
+                    foreach ($m in [regex]::Matches($text, $telegram_regex)) {
+                        $accounts += [PSCustomObject]@{ UID = $m.Groups[1].Value; Key = $m.Groups[2].Value }
+                    }
                 }
             }
         }
@@ -231,7 +233,9 @@ if (![string]::IsNullOrWhiteSpace($uid) -and ![string]::IsNullOrWhiteSpace($SK_O
 
 if ($telegram_notify) {
     $fetched = Get-TelegramCredentials
-    if ($fetched.Count -gt 0) { Write-Host "✅ Telegram credentials found ($($fetched.Count) accounts)" -ForegroundColor Gray }
+    if ($fetched.Count -gt 0) {
+        Write-Host "✅ Telegram credentials found ($($fetched.Count) accounts)" -ForegroundColor Gray
+    }
     $AccountList += $fetched
 }
 
@@ -276,11 +280,12 @@ if ($AccountList.Count -gt 0) {
 
             $res = "$(if ($ok) { '✅' } else { '❌' }) [$u]: $msg"
             Write-Host "└─ $res" -ForegroundColor $(if ($ok) { "Green" } else { "Red" })
-            $AllResults += $res
+
+            if ($msg -notmatch "(?i)(repeat|already|重複|重复|중복)") { $AllResults += $res }
         }
     }
 
-    if ($telegram_notify -and $telegramBotToken -and $myTelegramID) {
+    if ($telegram_notify -and $telegramBotToken -and $myTelegramID -and $AllResults.Count -gt 0) {
         $summary = $AllResults -join "`n"
         $tgJson = @{ chat_id = $myTelegramID; text = "<b>Skport_Arknights_AutoCheckin:</b>`n$summary"; parse_mode = "HTML" } | ConvertTo-Json -Depth 2 -Compress
         $tgBytes = [System.Text.Encoding]::UTF8.GetBytes($tgJson)
