@@ -1,6 +1,7 @@
 # This script registers Skport_Arknights_AutoCheckin.ps1 to run at system startup and daily.
 
 # ── Settings ──────────────────────────────────────────────────────────
+$ScriptName = "Skport_Arknights_AutoCheckin.ps1"
 $AutoCheckinTime = "00:00"  # Format: HH:mm (24-hour clock)
 # ──────────────────────────────────────────────────────────────────────
 
@@ -23,7 +24,6 @@ if ($IsWindows -or $env:OS -eq "Windows_NT") {
     }
 }
 
-$ScriptName = "Skport_Arknights_AutoCheckin.ps1"
 $ScriptPath = Join-Path $PSScriptRoot $ScriptName
 
 if (!(Test-Path $ScriptPath)) {
@@ -46,7 +46,7 @@ Write-Host "   Schedule: Startup & Daily at $AutoCheckinTime" -ForegroundColor D
 
 # ── Windows (Task Scheduler) ──────────────────────────────────────────
 if ($IsWindows -or $env:OS -eq "Windows_NT") {
-    $TaskName = "Skport_Arknights_AutoCheckin"
+    $TaskName = [System.IO.Path]::GetFileNameWithoutExtension($ScriptName)
     $Action = New-ScheduledTaskAction -Execute $PwshExe -Argument "-NoProfile -WindowStyle Hidden -File `"$ScriptPath`""
     
     # Trigger 1: At Logon
@@ -87,7 +87,8 @@ elseif ($IsLinux) {
 
 # ── macOS (LaunchAgent) ────────────────────────────────────────────────
 elseif ($IsMacOS) {
-    $Label = "com.user.arknights.autocheckin"
+    $BaseName = [System.IO.Path]::GetFileNameWithoutExtension($ScriptName)
+    $Label = "com.user.$($BaseName.ToLower().Replace('_', '.'))"
     $PlistPath = Join-Path $env:HOME "Library/LaunchAgents/$Label.plist"
     
     $PlistContent = @"
