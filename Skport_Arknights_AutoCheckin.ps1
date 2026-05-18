@@ -38,17 +38,19 @@ function Send-WsFrame ($Ws, $Json) {
 }
 
 function Get-TelegramCredentials {
-    if (!$telegramBotToken) { return @() }
+    if (!$telegramBotToken -or !$myTelegramID) { return @() }
     $accounts = @()
     try {
-        $updates = Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/getUpdates" -TimeoutSec 30
-        if ($updates.ok -and $updates.result) {
-            foreach ($u in $updates.result) {
-                $text = if ($u.message.text) { $u.message.text } elseif ($u.channel_post.text) { $u.channel_post.text } else { "" }
-                if ($text -match $telegram_regex) {
-                    foreach ($m in [regex]::Matches($text, $telegram_regex)) {
-                        $accounts += [PSCustomObject]@{ UID = $m.Groups[1].Value; Key = $m.Groups[2].Value }
-                    }
+        $chat = Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/getChat?chat_id=$myTelegramID" -TimeoutSec 30
+        if ($chat.ok -and $chat.result) {
+            $text = ""
+            if ($chat.result.pinned_message.text) { $text += "`n" + $chat.result.pinned_message.text }
+            elseif ($chat.result.pinned_message.caption) { $text += "`n" + $chat.result.pinned_message.caption }
+            if ($chat.result.description) { $text += "`n" + $chat.result.description }
+            
+            if ($text -match $telegram_regex) {
+                foreach ($m in [regex]::Matches($text, $telegram_regex)) {
+                    $accounts += [PSCustomObject]@{ UID = $m.Groups[1].Value; Key = $m.Groups[2].Value }
                 }
             }
         }
