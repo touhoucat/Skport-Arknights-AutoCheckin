@@ -6,7 +6,7 @@ $uid = "12345678"                                       # your Arknights game ID
 $server = "2"                                           # Asia=2 / Americas=3 / Europe=3
 $language = "zh_Hant"                                   # english=en / 繁體中文=zh_Hant / 简体中文=zh_Hans / 日本語=ja / 한국어=ko
 
-$telegram_notify = $false
+$telegram_notify = $false # Set to $true to enable
 $myTelegramID = ""
 $telegramBotToken = ""
 
