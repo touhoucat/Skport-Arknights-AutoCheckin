@@ -49,8 +49,9 @@ if ($IsWindows -or $env:OS -eq "Windows_NT") {
     $TaskName = [System.IO.Path]::GetFileNameWithoutExtension($ScriptName)
     $Action = New-ScheduledTaskAction -Execute $PwshExe -Argument "-NoProfile -WindowStyle Hidden -File `"$ScriptPath`""
     
-    # Trigger 1: At Logon
+    # Trigger 1: At Logon with 1 minute delay
     $T1 = New-ScheduledTaskTrigger -AtLogOn
+    $T1.Delay = "PT1M"
     # Trigger 2: Daily at the specified time
     $T2 = New-ScheduledTaskTrigger -Daily -At $winTime
 
