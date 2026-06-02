@@ -41,7 +41,7 @@ function Get-TelegramCredentials {
     if (!$telegramBotToken -or !$myTelegramID) { return @() }
     $accounts = @()
     try {
-        $chat = Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/getChat?chat_id=$myTelegramID" -TimeoutSec 30
+        $chat = Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/getChat?chat_id=$myTelegramID" -TimeoutSec 60
         if ($chat.ok -and $chat.result) {
             $text = ""
             if ($chat.result.pinned_message.text) { $text += "`n" + $chat.result.pinned_message.text }
@@ -134,10 +134,10 @@ function Get-SkToken {
 
     # --- Poll CDP ---
     $wsUrl = $null
-    for ($i = 0; $i -lt 60; $i++) {
+    for ($i = 0; $i -lt 120; $i++) {
         Start-Sleep -Milliseconds 500
         try {
-            $targets = Invoke-RestMethod -Uri "http://localhost:$port/json" -TimeoutSec 10 -ErrorAction Stop
+            $targets = Invoke-RestMethod -Uri "http://localhost:$port/json" -TimeoutSec 60 -ErrorAction Stop
             $wsUrl = ($targets | Where-Object { $_.type -eq "page" } | Select-Object -First 1).webSocketDebuggerUrl
             if ($wsUrl) { break }
         }
@@ -162,7 +162,7 @@ function Get-SkToken {
         Start-Sleep -Milliseconds 500
         Send-WsFrame $ws "{`"id`":2,`"method`":`"Page.navigate`",`"params`":{`"url`":`"$loginUrl`"}}"
 
-        for ($i = 0; $i -lt 60; $i++) {
+        for ($i = 0; $i -lt 120; $i++) {
             Start-Sleep -Milliseconds 500
             $id = 100 + $i
             Send-WsFrame $ws "{`"id`":$id,`"method`":`"Runtime.evaluate`",`"params`":{`"expression`":`"localStorage.getItem('SK_TOKEN_CACHE_KEY')`",`"returnByValue`":true}}"
@@ -271,7 +271,7 @@ if ($AccountList.Count -gt 0) {
             $headers["sign"] = New-SkportSignature -Body $body -Headers $headers -Token $tk.Value
 
             try {
-                $resp = Invoke-RestMethod "$baseUrl/api/v1/game/attendance" -Method Post -Headers $headers -Body $body -TimeoutSec 30 -ErrorAction Stop
+                $resp = Invoke-RestMethod "$baseUrl/api/v1/game/attendance" -Method Post -Headers $headers -Body $body -TimeoutSec 60 -ErrorAction Stop
                 $ok = $resp.code -ne 10000
                 $msg = if ($resp.code -eq 10000) { "Token expired after refresh!" } else { $resp.message }
             }
@@ -291,7 +291,7 @@ if ($AccountList.Count -gt 0) {
         $summary = $AllResults -join "`n"
         $tgJson = @{ chat_id = $myTelegramID; text = "<b>Skport_Arknights_AutoCheckin:</b>`n$summary"; parse_mode = "HTML" } | ConvertTo-Json -Depth 2 -Compress
         $tgBytes = [System.Text.Encoding]::UTF8.GetBytes($tgJson)
-        try { Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/sendMessage" -Method Post -Body $tgBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 30 | Out-Null }
+        try { Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/sendMessage" -Method Post -Body $tgBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 60 | Out-Null }
         catch {}
     }
 }
