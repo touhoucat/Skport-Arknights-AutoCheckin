@@ -103,7 +103,6 @@ function Get-SkToken {
         "--headless=new"
         "--remote-debugging-port=$port"
         "--user-data-dir=`"$profileDir`""
-        "--incognito"
         "--no-first-run"
         "--no-default-browser-check"
         "--mute-audio"
@@ -117,6 +116,10 @@ function Get-SkToken {
         "--use-mock-keychain"
         "--disable-logging"
         "--log-level=3"
+        # "--incognito"
+        "--disable-blink-features=AutomationControlled"
+        "--window-size=1920,1080"
+        "--user-agent=`"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36`""
         "about:blank"
     )
     if ($IsLinuxPlatform) {
