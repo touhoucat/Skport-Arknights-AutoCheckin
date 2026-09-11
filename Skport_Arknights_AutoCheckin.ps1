@@ -1,7 +1,7 @@
 # Skport-Arknights-AutoCheckin ( Windows / Linux / macOS )
 
 # ── Settings ───────────────────────────────────────────
-$SK_OAUTH_CRED_KEY = "AAbbCC99Sk0aUtH1XXXCrED8KeY2kI6e" # your skport SK_OAUTH_CRED_KEY in cookie
+$SK_OAUTH_CRED_KEY = "AAbbCC99Sk0aUuH11XXCcED8KkYykkee" # your skport SK_OAUTH_CRED_KEY in cookie
 $uid = "12345678"                                       # your Arknights game ID
 $server = "2"                                           # Asia=2 / Americas=3 / Europe=3
 $language = "zh_Hant"                                   # english=en / 繁體中文=zh_Hant / 简体中文=zh_Hans / 日本語=ja / 한국어=ko
@@ -12,10 +12,11 @@ $telegramBotToken = ""
 
 $BrowserChoice = "auto" # auto / chrome / edge / <absolute path>
 # ──────────────────────────────────────────────────────
-
+ 
 $telegram_regex = '(?i)UID[:\uFF1A]\s*(\d{8})[\s,\uFF0C]*KEY[:\uFF1A]\s*([a-zA-Z0-9]{32})'
 $GlobalStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-$IsLinuxPlatform = $PSVersionTable.PSEdition -eq 'Core' -and $IsLinux
+$script:LastStepTime = 0.0
+
 $baseUrl = "https://zonai.skport.com"
 $DefaultHeaders = @{
     'Accept'          = '*/*'
@@ -30,24 +31,31 @@ $DefaultHeaders = @{
     'Sec-Fetch-Mode'  = 'cors'
     'Sec-Fetch-Site'  = 'same-site'
 }
-
+ 
 # ── Helpers ────────────────────────────────────────────
+function Write-StepTime ([string]$Message, [string]$Indent = "") {
+    $cur = $GlobalStopwatch.Elapsed.TotalSeconds
+    $delta = $cur - $script:LastStepTime
+    $script:LastStepTime = $cur
+    Write-Host "${Indent}⏱️ ${Message}: $([math]::Round($cur, 2))s (+$([math]::Round($delta, 2))s)" -ForegroundColor DarkGray
+}
+
 function Send-WsFrame ($Ws, $Json) {
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($Json)
     $Ws.SendAsync([System.ArraySegment[byte]]::new($bytes), [System.Net.WebSockets.WebSocketMessageType]::Text, $true, [System.Threading.CancellationToken]::None).Wait()
 }
-
+ 
 function Get-TelegramCredentials {
     if (!$telegramBotToken -or !$myTelegramID) { return @() }
     $accounts = @()
     try {
-        $chat = Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/getChat?chat_id=$myTelegramID" -TimeoutSec 180
+        $chat = Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/getChat?chat_id=$myTelegramID" -TimeoutSec 90
         if ($chat.ok -and $chat.result) {
             $text = ""
             if ($chat.result.pinned_message.text) { $text += "`n" + $chat.result.pinned_message.text }
             elseif ($chat.result.pinned_message.caption) { $text += "`n" + $chat.result.pinned_message.caption }
             if ($chat.result.description) { $text += "`n" + $chat.result.description }
-            
+ 
             if ($text -match $telegram_regex) {
                 foreach ($m in [regex]::Matches($text, $telegram_regex)) {
                     $accounts += [PSCustomObject]@{ UID = $m.Groups[1].Value; Key = $m.Groups[2].Value }
@@ -58,7 +66,34 @@ function Get-TelegramCredentials {
     catch { Write-Host "⚠️ Telegram fetch failed: $($_.Exception.Message)" -ForegroundColor Yellow }
     return $accounts | Group-Object UID | ForEach-Object { $_.Group | Select-Object -Last 1 }
 }
-
+ 
+# ── Dynamic browser path resolution ─────────────────────
+function Find-Browser ($Choice) {
+    if ($Choice -notin @("auto", "chrome", "edge")) { return $Choice }
+ 
+    $names = @()
+    if ($Choice -ne "edge") { $names += "chrome", "google-chrome", "chromium", "chromium-browser" }
+    if ($Choice -ne "chrome") { $names += "msedge", "microsoft-edge" }
+ 
+    foreach ($n in $names) {
+        $c = Get-Command $n -ErrorAction SilentlyContinue
+        if ($c) { return $c.Source }
+    }
+ 
+    # Fallback: fixed install paths not registered on PATH (typical on Windows/macOS)
+    $fallback = [System.Collections.Generic.List[string]]::new()
+    if ($Choice -ne "edge") {
+        $fallback.Add("C:\Program Files\Google\Chrome\Application\chrome.exe")
+        $fallback.Add("C:\Program Files (x86)\Google\Chrome\Application\chrome.exe")
+        $fallback.Add("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+    }
+    if ($Choice -ne "chrome") {
+        $fallback.Add("C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
+        $fallback.Add("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge")
+    }
+    return $fallback | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+ 
 # ── Token ──────────────────────────────────────────────
 function Get-SkToken {
     param ([string] $OAuthKey)
@@ -67,38 +102,16 @@ function Get-SkToken {
     $port = Get-Random -Minimum 9000 -Maximum 9999
     $profileDir = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "CDP_Skport_$port")
     if (Test-Path $profileDir) { Remove-Item $profileDir -Recurse -Force -ErrorAction SilentlyContinue }
-
-    # --- Cross-platform browser path resolution ---
-    $searchPaths = [System.Collections.Generic.List[string]]::new()
-    if ($BrowserChoice -ne "edge") {
-        $searchPaths.Add("C:\Program Files\Google\Chrome\Application\chrome.exe")
-        $searchPaths.Add("C:\Program Files (x86)\Google\Chrome\Application\chrome.exe")
-        $searchPaths.Add("/usr/bin/google-chrome")
-        $searchPaths.Add("/usr/bin/chromium")
-        $searchPaths.Add("/usr/bin/chromium-browser")
-        $searchPaths.Add("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
-    }
-    if ($BrowserChoice -ne "chrome") {
-        $searchPaths.Add("C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-        $searchPaths.Add("/usr/bin/microsoft-edge")
-        $searchPaths.Add("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge")
-    }
-
-    $exe = if ($BrowserChoice -notin @("auto", "chrome", "edge")) {
-        $BrowserChoice
-    }
-    else {
-        $searchPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-    }
-
+ 
+    $exe = Find-Browser -Choice $BrowserChoice
     if ([string]::IsNullOrWhiteSpace($exe) -or !(Test-Path $exe)) {
         return @{ OK = $false; Value = "Browser not found." }
     }
-
+ 
     $engine = if ($exe -match "edge") { "Edge" } else { "Chrome/Chromium" }
     Write-Host "│  🌐 $engine" -ForegroundColor Cyan
-
-    # --- Browser args  ---
+ 
+    # --- Browser args (headless=new, low-memory tuned) ---
     $argList = [System.Collections.Generic.List[string]]@(
         "--headless=new"
         "--remote-debugging-port=$port"
@@ -116,28 +129,30 @@ function Get-SkToken {
         "--use-mock-keychain"
         "--disable-logging"
         "--log-level=3"
-        # "--incognito"
         "--disable-blink-features=AutomationControlled"
-        "--window-size=1920,1080"
+        "--window-size=640,480"
         "--user-agent=`"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36`""
+        "--disable-software-rasterizer"
+        "--disable-features=site-per-process"
+        "--renderer-process-limit=1"
+        "--js-flags=--max-old-space-size=256"
+        "--no-sandbox"
         "about:blank"
     )
-    if ($IsLinuxPlatform) {
-        $argList.Add("--disable-software-rasterizer")
-        $argList.Add("--single-process")
-        $argList.Add("--no-zygote")
-    }
-
+ 
     $psi = [System.Diagnostics.ProcessStartInfo]::new($exe, ($argList -join " "))
     $psi.CreateNoWindow = $true
     $psi.UseShellExecute = $false
     $psi.RedirectStandardError = $true
     $proc = [System.Diagnostics.Process]::Start($psi)
+    $errSub = Register-ObjectEvent -InputObject $proc -EventName ErrorDataReceived -Action { }
     $proc.BeginErrorReadLine()
+ 
+    Write-StepTime "Browser launched" "│  "
 
     # --- Poll CDP ---
     $wsUrl = $null
-    for ($i = 0; $i -lt 120; $i++) {
+    for ($i = 0; $i -lt 240; $i++) {
         Start-Sleep -Milliseconds 500
         try {
             $targets = Invoke-RestMethod -Uri "http://localhost:$port/json" -TimeoutSec 180 -ErrorAction Stop
@@ -146,31 +161,55 @@ function Get-SkToken {
         }
         catch {}
     }
-
+ 
     if (!$wsUrl) {
         try { Stop-Process $proc.Id -Force -ErrorAction SilentlyContinue; $proc.Dispose() } catch {}
         return @{ OK = $false; Value = "Timeout: CDP unavailable." }
     }
+ 
+    Write-StepTime "CDP ready" "│  "
 
     # --- Extract token via WebSocket ---
     $token = $null; $ws = $null; $cts = $null
-    $buf = [byte[]]::new(8192);
+    $buf = [byte[]]::new(8192)
     $seg = [System.ArraySegment[byte]]::new($buf)
+ 
     try {
         $ws = [System.Net.WebSockets.ClientWebSocket]::new()
         $cts = [System.Threading.CancellationTokenSource]::new()
         $ws.ConnectAsync([uri]$wsUrl, $cts.Token).Wait()
-
+ 
         Send-WsFrame $ws "{`"id`":1,`"method`":`"Network.setCookie`",`"params`":{`"name`":`"SK_OAUTH_CRED_KEY`",`"value`":`"$OAuthKey`",`"domain`":`".skport.com`",`"path`":`"/`"}}"
         Start-Sleep -Milliseconds 500
-        Send-WsFrame $ws "{`"id`":2,`"method`":`"Page.navigate`",`"params`":{`"url`":`"$loginUrl`"}}"
+        Send-WsFrame $ws "{`"id`":2,`"method`":`"Page.enable`",`"params`":{}}"
+        Send-WsFrame $ws "{`"id`":3,`"method`":`"Page.navigate`",`"params`":{`"url`":`"$loginUrl`"}}"
+ 
+        $loaded = $false
+        $loadDeadline = [DateTime]::UtcNow.AddSeconds(60)
+        while ([DateTime]::UtcNow -lt $loadDeadline -and -not $loaded) {
+            $frameMs = [System.IO.MemoryStream]::new()
+            try {
+                do {
+                    $t = $ws.ReceiveAsync($seg, $cts.Token)
+                    if (!$t.Wait(500)) { break }
+                    $frameMs.Write($buf, 0, $t.Result.Count)
+                } while (!$t.Result.EndOfMessage)
+                if ($frameMs.Length -gt 0) {
+                    $frame = [System.Text.Encoding]::UTF8.GetString($frameMs.ToArray())
+                    if ($frame -match '"method":"Page\.loadEventFired"') { $loaded = $true }
+                }
+            }
+            catch { break }
+            finally { $frameMs.Dispose() }
+        }
+ 
+        Write-StepTime "Page loaded" "│  "
 
-        for ($i = 0; $i -lt 120; $i++) {
-            Start-Sleep -Milliseconds 500
+        for ($i = 0; $i -lt 30; $i++) {
             $id = 100 + $i
             Send-WsFrame $ws "{`"id`":$id,`"method`":`"Runtime.evaluate`",`"params`":{`"expression`":`"localStorage.getItem('SK_TOKEN_CACHE_KEY')`",`"returnByValue`":true}}"
-
-            $deadline = [DateTime]::UtcNow.AddMilliseconds(1500)
+ 
+            $deadline = [DateTime]::UtcNow.AddMilliseconds(1000)
             while ([DateTime]::UtcNow -lt $deadline) {
                 $ms = [System.IO.MemoryStream]::new()
                 try {
@@ -191,18 +230,23 @@ function Get-SkToken {
                 catch { break } finally { $ms.Dispose() }
             }
             if ($token) { break }
+            Start-Sleep -Milliseconds 300
         }
+
+        Write-StepTime "Token retrieved" "│  "
+ 
         if ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
             $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "done", $cts.Token).Wait()
         }
     }
     catch { $token = $null }
     finally { if ($ws) { $ws.Dispose() }; if ($cts) { $cts.Dispose() } }
-
+ 
     try { Stop-Process $proc.Id -Force -ErrorAction SilentlyContinue; $proc.Dispose() } catch {}
+    if ($errSub) { Unregister-Event -SourceIdentifier $errSub.Name -ErrorAction SilentlyContinue; Remove-Job $errSub -Force -ErrorAction SilentlyContinue }
     Start-Sleep -Milliseconds 200
     Remove-Item $profileDir -Recurse -Force -ErrorAction SilentlyContinue
-
+ 
     if ($token) {
         try {
             $val = ($token | ConvertFrom-Json).result.result.value
@@ -212,50 +256,51 @@ function Get-SkToken {
     }
     return @{ OK = $false; Value = "Token not found (credentials may be expired)." }
 }
-
+ 
 # ── Signature ──────────────────────────────────────────
 function New-SkportSignature ($Body, $Headers, $Token) {
     $raw = "/api/v1/game/attendance" + $Body + $Headers["timestamp"] + ([ordered]@{ platform = $Headers["platform"]; timestamp = $Headers["timestamp"]; dId = ""; vName = $Headers["vName"] } | ConvertTo-Json -Compress)
-
+ 
     $hmac = [System.Security.Cryptography.HMACSHA256]::new([System.Text.Encoding]::UTF8.GetBytes($Token))
     try { $hex = [System.BitConverter]::ToString($hmac.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($raw))).Replace("-", "").ToLower() }
     finally { $hmac.Dispose() }
-
+ 
     $md5 = [System.Security.Cryptography.MD5]::Create()
     try { return [System.BitConverter]::ToString($md5.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($hex))).Replace("-", "").ToLower() }
     finally { $md5.Dispose() }
 }
-
+ 
 # ══ Main ════════════════════════════════════════════════
 Write-Host "╔══════════════════════════════╗" -ForegroundColor DarkCyan
 Write-Host "║   Skport Auto Sign-in Bot    ║" -ForegroundColor DarkCyan
 Write-Host "╚══════════════════════════════╝" -ForegroundColor DarkCyan
-
+ 
 $AccountList = @()
 if (![string]::IsNullOrWhiteSpace($uid) -and ![string]::IsNullOrWhiteSpace($SK_OAUTH_CRED_KEY)) {
     $AccountList += [PSCustomObject]@{ UID = $uid; Key = $SK_OAUTH_CRED_KEY }
 }
-
+ 
 if ($telegram_notify) {
     $fetched = Get-TelegramCredentials
     if ($fetched.Count -gt 0) {
         Write-Host "✅ Telegram credentials found ($($fetched.Count) accounts)" -ForegroundColor Gray
     }
+    Write-StepTime "Telegram credentials fetched"
     $AccountList += $fetched
 }
-
+ 
 # Deduplicate
 $AccountList = $AccountList | Group-Object UID | ForEach-Object { $_.Group | Select-Object -Last 1 }
-
+ 
 if ($AccountList.Count -gt 0) {
     $AllResults = @()
     foreach ($acc in $AccountList) {
         $u = $acc.UID
         $k = $acc.Key
         Write-Host "┌─ 🤖 UID: $u" -ForegroundColor DarkCyan
-
+ 
         $tk = Get-SkToken -OAuthKey $k
-
+ 
         if (-not $tk.OK) {
             $res = "❌ [$u]: $($tk.Value)"
             Write-Host "└─ $res" -ForegroundColor Red
@@ -263,7 +308,7 @@ if ($AccountList.Count -gt 0) {
         }
         else {
             Write-Host "│  🔑 $($tk.Value)" -ForegroundColor DarkYellow
-
+ 
             $ts = [Math]::Floor([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()).ToString()
             $body = "{`"uid`":`"$u`"}"
             $headers = $DefaultHeaders.Clone()
@@ -272,9 +317,9 @@ if ($AccountList.Count -gt 0) {
             $headers["sk-language"] = $language
             $headers["timestamp"] = $ts
             $headers["sign"] = New-SkportSignature -Body $body -Headers $headers -Token $tk.Value
-
+ 
             try {
-                $resp = Invoke-RestMethod "$baseUrl/api/v1/game/attendance" -Method Post -Headers $headers -Body $body -TimeoutSec 180 -ErrorAction Stop
+                $resp = Invoke-RestMethod "$baseUrl/api/v1/game/attendance" -Method Post -Headers $headers -Body $body -TimeoutSec 90 -ErrorAction Stop
                 $ok = $resp.code -ne 10000
                 $msg = if ($resp.code -eq 10000) { "Token expired after refresh!" } else { $resp.message }
             }
@@ -282,21 +327,26 @@ if ($AccountList.Count -gt 0) {
                 $ok = $false; $msg = $_.Exception.Message
                 if ($_.ErrorDetails.Message) { try { $j = $_.ErrorDetails.Message | ConvertFrom-Json; if ($j.message) { $msg = $j.message } } catch {} }
             }
+ 
+            Write-StepTime "Attendance API called" "│  "
 
             $res = "$(if ($ok) { '✅' } else { '❌' }) [$u]: $msg"
             Write-Host "└─ $res" -ForegroundColor $(if ($ok) { "Green" } else { "Red" })
-
+ 
             if ($msg -notmatch "(?i)(repeat|already|重複|重复|중복)") { $AllResults += $res }
         }
     }
-
+ 
     if ($telegram_notify -and $telegramBotToken -and $myTelegramID -and $AllResults.Count -gt 0) {
         $summary = $AllResults -join "`n"
         $tgJson = @{ chat_id = $myTelegramID; text = "<b>Skport_Arknights_AutoCheckin:</b>`n$summary"; parse_mode = "HTML" } | ConvertTo-Json -Depth 2 -Compress
         $tgBytes = [System.Text.Encoding]::UTF8.GetBytes($tgJson)
-        try { Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/sendMessage" -Method Post -Body $tgBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 180 | Out-Null }
+        try { 
+            Invoke-RestMethod "https://api.telegram.org/bot$telegramBotToken/sendMessage" -Method Post -Body $tgBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 60 | Out-Null 
+            Write-StepTime "Telegram notification sent"
+        }
         catch {}
     }
 }
-
+ 
 Write-Host "⏱️ Done: $([math]::Round($GlobalStopwatch.Elapsed.TotalSeconds, 1))s" -ForegroundColor DarkGray
