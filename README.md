@@ -1,5 +1,5 @@
-# 明日方舟 自動簽到Skport網頁
-# Skport-Arknights-AutoCheckin
+# 明日方舟 自動簽到Skport網頁 (不是終末地)
+# Skport-Arknights-AutoCheckin (Not for Endfield)
 
 > [!NOTE]
 > This script is specifically designed for **Arknights (明日方舟)**.
