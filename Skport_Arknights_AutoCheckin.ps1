@@ -116,28 +116,28 @@ function Get-SkToken {
         "--headless=new"
         "--remote-debugging-port=$port"
         "--user-data-dir=`"$profileDir`""
-        "--no-first-run"
-        "--no-default-browser-check"
-        "--mute-audio"
-        "--disable-gpu"
-        "--disable-dev-shm-usage"
-        "--disable-extensions"
-        "--disable-background-networking"
-        "--disable-default-apps"
-        "--metrics-recording-only"
-        "--password-store=basic"
-        "--use-mock-keychain"
-        "--disable-logging"
-        "--log-level=3"
-        "--disable-blink-features=AutomationControlled"
-        "--window-size=640,480"
-        "--user-agent=`"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36`""
-        "--disable-software-rasterizer"
-        "--disable-features=site-per-process"
-        "--renderer-process-limit=1"
-        "--js-flags=--max-old-space-size=256"
         "--no-sandbox"
-        "about:blank"
+        # "--no-first-run"
+        # "--no-default-browser-check"
+        # "--mute-audio"
+        # "--disable-gpu"
+        # "--disable-dev-shm-usage"
+        # "--disable-extensions"
+        # "--disable-background-networking"
+        # "--disable-default-apps"
+        # "--metrics-recording-only"
+        # "--password-store=basic"
+        # "--use-mock-keychain"
+        # "--disable-logging"
+        # "--log-level=3"
+        # "--disable-blink-features=AutomationControlled"
+        # "--window-size=640,480"
+        # "--user-agent=`"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36`""
+        # "--disable-software-rasterizer"
+        # "--disable-features=site-per-process"
+        # "--renderer-process-limit=1"
+        # "--js-flags=--max-old-space-size=256"
+        # "about:blank"
     )
  
     $psi = [System.Diagnostics.ProcessStartInfo]::new($exe, ($argList -join " "))
@@ -152,8 +152,8 @@ function Get-SkToken {
 
     # --- Poll CDP ---
     $wsUrl = $null
-    for ($i = 0; $i -lt 240; $i++) {
-        Start-Sleep -Milliseconds 500
+    for ($i = 0; $i -lt 200; $i++) {
+        Start-Sleep -Milliseconds 250
         try {
             $targets = Invoke-RestMethod -Uri "http://localhost:$port/json" -TimeoutSec 60 -ErrorAction Stop
             $wsUrl = ($targets | Where-Object { $_.type -eq "page" } | Select-Object -First 1).webSocketDebuggerUrl
@@ -179,8 +179,8 @@ function Get-SkToken {
         $cts = [System.Threading.CancellationTokenSource]::new()
         $ws.ConnectAsync([uri]$wsUrl, $cts.Token).Wait()
  
-        # Start-Sleep -Milliseconds 500
-        Send-WsFrame $ws "{`"id`":1,`"method`":`"Network.setCookie`",`"params`":{`"name`":`"SK_OAUTH_CRED_KEY`",`"value`":`"$OAuthKey`",`"url`":`"https://game.skport.com`",`"domain`":`".skport.com`",`"path`":`"/`"}}"
+        Send-WsFrame $ws "{`"id`":1,`"method`":`"Network.setCookie`",`"params`":{`"name`":`"SK_OAUTH_CRED_KEY`",`"value`":`"$OAuthKey`",`"domain`":`".skport.com`",`"path`":`"/`"}}"
+        Start-Sleep -Milliseconds 500
         Send-WsFrame $ws "{`"id`":2,`"method`":`"Page.enable`",`"params`":{}}"
         Send-WsFrame $ws "{`"id`":3,`"method`":`"Page.navigate`",`"params`":{`"url`":`"$loginUrl`"}}"
  
@@ -231,10 +231,8 @@ function Get-SkToken {
                 catch { break } finally { $ms.Dispose() }
             }
             if ($token) { break }
-            Start-Sleep -Milliseconds 300
+            Start-Sleep -Milliseconds 250
         }
-
-        Write-StepTime "Token retrieved" "│  "
  
         if ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
             $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "done", $cts.Token).Wait()
@@ -245,7 +243,7 @@ function Get-SkToken {
  
     try { Stop-Process $proc.Id -Force -ErrorAction SilentlyContinue; $proc.Dispose() } catch {}
     if ($errSub) { Unregister-Event -SourceIdentifier $errSub.Name -ErrorAction SilentlyContinue; Remove-Job $errSub -Force -ErrorAction SilentlyContinue }
-    Start-Sleep -Milliseconds 200
+    Start-Sleep -Milliseconds 250
     Remove-Item $profileDir -Recurse -Force -ErrorAction SilentlyContinue
  
     if ($token) {
