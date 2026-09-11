@@ -39,9 +39,6 @@ $language          = "zh_Hant"       # english=en / 繁體中文=zh_Hant / 简�
 $telegram_notify   = $false          # Set to $true to enable
 $myTelegramID      = ""              # Your Telegram Chat ID
 $telegramBotToken  = ""              # Your Telegram Bot Token
-
-# --- Browser Selection ---
-$BrowserChoice     = "auto"          # auto / chrome / edge / or "C:\path\to\exe"
 ```
 
 ### How to find $SK_OAUTH_CRED_KEY?
