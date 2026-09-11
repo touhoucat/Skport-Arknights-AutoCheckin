@@ -297,7 +297,8 @@ if ($AccountList.Count -gt 0) {
     foreach ($acc in $AccountList) {
         $u = $acc.UID
         $k = $acc.Key
-        Write-Host "┌─ 🤖 UID: $u" -ForegroundColor DarkCyan
+        $maskedKey = if ($k.Length -gt 8) { "$($k.Substring(0,4))...$($k.Substring($k.Length - 4))" } else { $k }
+        Write-Host "┌─ 🤖 UID: $u (OAuthKey: $maskedKey)" -ForegroundColor DarkCyan
  
         $tk = Get-SkToken -OAuthKey $k
  
