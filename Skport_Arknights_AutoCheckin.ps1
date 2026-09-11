@@ -12,9 +12,9 @@ $telegramBotToken = ""
 
 $BrowserChoice = "auto" # auto / chrome / edge / <absolute path>
 # ──────────────────────────────────────────────────────
- 
-$telegram_regex = '(?i)UID[:\uFF1A]\s*(\d{8})[\s,\uFF0C]*KEY[:\uFF1A]\s*([a-zA-Z0-9]{32})'
+
 $GlobalStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+$telegram_regex = '(?i)UID[:\uFF1A]\s*(\d{8})[\s,\uFF0C]*KEY[:\uFF1A]\s*([a-zA-Z0-9]{32})'
 $script:LastStepTime = 0.0
 
 $baseUrl = "https://zonai.skport.com"
