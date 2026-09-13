@@ -124,10 +124,10 @@ function Get-SkToken {
 
     # --- Poll CDP ---
     $wsUrl = $null
-    for ($i = 0; $i -lt 200; $i++) {
+    for ($i = 0; $i -lt 500; $i++) {
         Start-Sleep -Milliseconds 250
         try {
-            $targets = Invoke-RestMethod -Uri "http://localhost:$port/json" -TimeoutSec 30 -ErrorAction Stop
+            $targets = Invoke-RestMethod -Uri "http://localhost:$port/json" -TimeoutSec 90 -ErrorAction Stop
             $wsUrl = ($targets | Where-Object { $_.type -eq "page" } | Select-Object -First 1).webSocketDebuggerUrl
             if ($wsUrl) { break }
         } catch {}
@@ -155,9 +155,9 @@ function Get-SkToken {
         Send-WsFrame $ws "{`"id`":3,`"method`":`"Page.navigate`",`"params`":{`"url`":`"$loginUrl`"}}"
 
         # Page.loadEventFired
-        $loadDeadline = [DateTime]::UtcNow.AddSeconds(30)
+        $loadDeadline = [DateTime]::UtcNow.AddSeconds(60)
         while ([DateTime]::UtcNow -lt $loadDeadline) {
-            $frame = Receive-WsText $ws $buf $cts 500
+            $frame = Receive-WsText $ws $buf $cts 5000
             if ($frame -and $frame -match '"method":"Page\.loadEventFired"') { break }
         }
 
@@ -165,13 +165,13 @@ function Get-SkToken {
         Write-StepTime "Page loaded" "│  "
 
         # localStorage Token
-        for ($i = 0; $i -lt 50; $i++) {
+        for ($i = 0; $i -lt 300; $i++) {
             $id = 100 + $i
             Send-WsFrame $ws "{`"id`":$id,`"method`":`"Runtime.evaluate`",`"params`":{`"expression`":`"localStorage.getItem('SK_TOKEN_CACHE_KEY')`",`"returnByValue`":true}}"
 
-            $deadline = [DateTime]::UtcNow.AddSeconds(1)
+            $deadline = [DateTime]::UtcNow.AddSeconds(30)
             while ([DateTime]::UtcNow -lt $deadline) {
-                $frame = Receive-WsText $ws $buf $cts 500
+                $frame = Receive-WsText $ws $buf $cts 5000
                 if ($frame -and $frame -match "`"id`":$id") {
                     if ($frame -notmatch "`"value`":null" -and $frame -notmatch "SecurityError") { $token = $frame }
                     break
@@ -291,8 +291,19 @@ if ($AccountList.Count -gt 0) {
 
             try {
                 $resp = Invoke-RestMethod "$baseUrl/api/v1/game/attendance" -Method Post -Headers $headers -Body $body -TimeoutSec 60 -ErrorAction Stop
-                $ok = $resp.code -ne 10000
-                $msg = if ($resp.code -eq 10000) { "Token expired after refresh!" } else { $resp.message }
+
+                $code = $resp.code
+                $apiMsg = if (-not [string]::IsNullOrWhiteSpace($resp.message)) { $resp.message } elseif (-not [string]::IsNullOrWhiteSpace($resp.msg)) { $resp.msg } else { "OK" }
+                if ($code -eq 0) {
+                    $ok = $true
+                    $msg = "$apiMsg (Code: 0)"
+                } elseif ($code -eq 10000) {
+                    $ok = $false
+                    $msg = "Token expired after refresh! (Code: 10000)"
+                } else {
+                    $ok = $false
+                    $msg = "$apiMsg (Code: $code)"
+                }
             }
             catch {
                 $ok = $false; $msg = $_.Exception.Message
