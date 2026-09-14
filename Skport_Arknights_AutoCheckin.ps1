@@ -294,15 +294,13 @@ if ($AccountList.Count -gt 0) {
 
                 $code = $resp.code
                 $apiMsg = if (-not [string]::IsNullOrWhiteSpace($resp.message)) { $resp.message } elseif (-not [string]::IsNullOrWhiteSpace($resp.msg)) { $resp.msg } else { "OK" }
-                if ($code -eq 0) {
-                    $ok = $true
-                    $msg = "$apiMsg (Code: 0)"
-                } elseif ($code -eq 10000) {
+
+                if ($null -ne $code -and $code -eq 10000) {
                     $ok = $false
                     $msg = "Token expired after refresh! (Code: 10000)"
                 } else {
-                    $ok = $false
-                    $msg = "$apiMsg (Code: $code)"
+                    $ok = $true
+                    $msg = if ($null -ne $code -and "" -ne "$code") { "$apiMsg (Code: $code)" } else { $apiMsg }
                 }
             }
             catch {
