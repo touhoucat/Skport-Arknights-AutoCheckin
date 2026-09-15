@@ -2,7 +2,7 @@
 
 # ── Settings ──────────────────────────────────────────────────────────
 $ScriptName = "Skport_Arknights_AutoCheckin.ps1"
-$AutoCheckinTime = "00:00"  # Format: HH:mm (24-hour clock)
+$AutoCheckinTime = "07:00"  # Format: HH:mm (24-hour clock)
 # ──────────────────────────────────────────────────────────────────────
 
 # ── Auto-Elevate to Administrator (Windows Only) ──────────────────────
@@ -42,15 +42,15 @@ $winTime = "$($hour.ToString('00')):$($minute.ToString('00'))"
 $PwshExe = (Get-Process -Id $PID).Path
 
 Write-Host "🚀 Registering Automation for: $ScriptPath" -ForegroundColor Cyan
-Write-Host "   Schedule: Startup & Daily at $AutoCheckinTime" -ForegroundColor DarkGray
+Write-Host "   Schedule: 1 min after Startup & Daily at $AutoCheckinTime" -ForegroundColor DarkGray
 
 # ── Windows (Task Scheduler) ──────────────────────────────────────────
 if ($IsWindows -or $env:OS -eq "Windows_NT") {
     $TaskName = [System.IO.Path]::GetFileNameWithoutExtension($ScriptName)
     $Action = New-ScheduledTaskAction -Execute $PwshExe -Argument "-NoProfile -WindowStyle Hidden -File `"$ScriptPath`""
     
-    # Trigger 1: At Logon with 1 minute delay
-    $T1 = New-ScheduledTaskTrigger -AtLogOn
+    # Trigger 1: At System Startup with 1 minute delay
+    $T1 = New-ScheduledTaskTrigger -AtStartup
     $T1.Delay = "PT1M"
     # Trigger 2: Daily at the specified time
     $T2 = New-ScheduledTaskTrigger -Daily -At $winTime
@@ -67,7 +67,7 @@ if ($IsWindows -or $env:OS -eq "Windows_NT") {
 # ── Linux (Crontab) ───────────────────────────────────────────────────
 elseif ($IsLinux) {
     $CronDaily = "$minute $hour * * * `"$PwshExe`" -File `"$ScriptPath`" > /dev/null 2>&1"
-    $CronReboot = "@reboot `"$PwshExe`" -File `"$ScriptPath`" > /dev/null 2>&1"
+    $CronReboot = "@reboot sleep 60 && `"$PwshExe`" -File `"$ScriptPath`" > /dev/null 2>&1"
     
     $CurrentCron = try { crontab -l 2>$null } catch { "" }
     $NewCron = ($CurrentCron -split "`n" | Where-Object { $_ -notmatch $ScriptName })
@@ -101,9 +101,9 @@ elseif ($IsMacOS) {
     <string>$Label</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$PwshExe</string>
-        <string>-File</string>
-        <string>$ScriptPath</string>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>sleep 60 &amp;&amp; exec "$PwshExe" -File "$ScriptPath"</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
