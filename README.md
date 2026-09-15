@@ -1,4 +1,4 @@
-# 明日方舟 自動簽到Skport網頁 (不是終末地)
+# 森空島-明日方舟-自動簽到 (不是終末地)
 # Skport-Arknights-AutoCheckin (Not for Endfield)
 
 > [!NOTE]
