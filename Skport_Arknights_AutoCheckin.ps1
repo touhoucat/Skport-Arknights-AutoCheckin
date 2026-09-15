@@ -201,7 +201,7 @@ function Get-SkToken {
             if (![string]::IsNullOrWhiteSpace($val)) { return @{ OK = $true; Value = $val } }
         } catch {}
     }
-    return @{ OK = $false; Value = "Token not found (credentials may be expired)." }
+    return @{ OK = $false; Value = "Token not found." }
 }
 
 # ── Signature ──────────────────────────────────────────
